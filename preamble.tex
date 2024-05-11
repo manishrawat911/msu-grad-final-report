@@ -1,0 +1,50 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% ZHAW REPORT CLASS
+% Preamble
+% 
+% Authors:
+% Martin Oswald
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%----------------------------------------
+%   REFERENCES
+%----------------------------------------
+\usepackage[
+    backend=biber,
+    sorting=none,
+    style=ieee
+]{biblatex}
+\usepackage{csquotes}
+\addbibresource{sources.bib}
+\usepackage[nameinlink, noabbrev]{cleveref}
+
+%----------------------------------------
+%   FLOATS
+%----------------------------------------
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{graphicx}
+% itmize
+\usepackage{enumitem}
+\setlist[itemize]{leftmargin=*, itemsep=0pt, parsep=0pt}
+
+%----------------------------------------
+%   CAPTIONS
+%----------------------------------------
+\usepackage{caption}
+\usepackage{floatrow}
+\usepackage[subrefformat=parens]{subcaption}
+\captionsetup[subfigure]{labelfont=rm,justification=centerlast,font=small,margin=50pt}
+\floatsetup[table]{capposition=top}
+\floatsetup[image]{capposition=bottom}
+
+%----------------------------------------
+%   CUSTOM PACKAGES
+%----------------------------------------
+\usepackage{glossaries}
+\usepackage{blindtext}
+% \usepackage{graphicx}
+% \usepackage{listings}
+% \usepackage[table,xcdraw]{colortbl}
+% \usepackage{colortbl}

@@ -1,0 +1,174 @@
+% !TEX root = ../main.tex
+
+%----------------------------------------
+%   APPENDIX TITLE
+%----------------------------------------
+\chapter{TEASync Components and Backend Server}
+% {TEASync Components and Backend Server}
+\label{appendix:A}
+% \section{TEASync Components and Backend Server}
+%----------------------------------------
+%   APPENDIX CONTENT
+%----------------------------------------
+\vspace{4pt}
+\begin{lstlisting}[language=Haskell, caption=Defining a Event component in TEASync Calendar Application, label=lst:java]
+drawMeeting : (Day,Start) -> Meeting -> Bool -> Shape (TEASync.Msg LocalMsg GlobalMsg GlobalModel)
+drawMeeting dayStart (Meet location duration attendance) dragging =
+  let
+    (x,y) = time2pos dayStart
+    (_,start) = dayStart
+    hour = start // 60
+    minutes = start - (60 * hour)
+    displayTime = String.fromInt (9+hour) 
+                ++ ":" 
+                ++ ("0"++String.fromInt minutes 
+                     |> String.right 2          )
+    
+    height = duration2height duration 
+    locShape =[ roundedRect 12 4 2
+                  |> filled (rgb 0 0 255)
+              , ( case location of
+                   Teams -> "Teams"
+                   Lab -> "Lab"
+                   PGCLL -> "PGCLL"
+                ) |> text |> size 2
+                  |> filled white
+                  |> move (-5,-0.5)
+              ] |> group
+                |> move (-7, -9 + 0.5 * height)
+                |> notifyTap (TapToToggleLocation dayStart |> GlobalMsg)
+    attendeeShapes = attendance
+      |> Dict.toList
+      |> List.indexedMap 
+            ( \ idx (person,isAttending) -> 
+                let
+                  (clr, check) = if isAttending then
+                                   (green,"✓")
+                                 else
+                                   (red,"��")
+                in [ roundedRect 12 4 2
+                                  |> filled clr
+                              , ( check ++ person) |> text |> size 2
+                                  |> filled black
+                                  |> move (-5,-0.5)
+                              ] |> group
+                                |> move (7, -4 - 5 * toFloat idx + 0.5 * height)
+                                |> notifyTap (TapToToggleAttendance dayStart person |> GlobalMsg)
+           )
+  in
+    [ roundedRect (dayWidth-1) height 1
+          |> filled orange
+          |> (if dragging then addOutline (solid 1) red else identity)
+    , displayTime |> text |> size 4 |> filled black
+                  |> move (-13, -5.5 + 0.5 * height)
+    -- topGrip
+    , grip |> move (0,0.5 * height)
+           |> notifyMouseDownAt (MouseDownToAdjustStartAt dayStart >> LocalMsg)
+    , grip |> scaleY (-1)
+           |> move (0,-0.5 * height)
+           |> notifyMouseDownAt (MouseDownToAdjustStopAt dayStart >> LocalMsg)
+    , locShape 
+    ] ++ attendeeShapes
+      |> group
+      |> move (x,y - 0.5 * height)
+\end{lstlisting}
+
+\begin{lstlisting}[language=Haskell, caption=TEASync Backend server (WSServer.hs), label=lst:java]
+    
+{-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
+
+module Application.TEASync.Types.WSServer where
+
+import IHP.Prelude
+import IHP.ModelSupport
+import Generated.Types
+
+import Control.Concurrent.STM
+import Data.Aeson
+import GHC.Generics
+
+type ClientID = Int
+type ServerID = Id TeasyncServer
+type WSClientQueue = TQueue WSClientCmd
+
+-- actions that can be queued up to be sent to Elm clients
+data WSClientCmd 
+    = SendConnected
+    | SendModel { model :: Value }
+    | SendMsg { id :: Text, message :: Value }
+    | SendModelRequest
+    | CloseWS
+
+-- message from Elm client
+data WSClientMsg =
+    WSClientMsg
+        {
+            cmd :: Text
+        ,   id  :: Text
+        ,   msg :: Value
+        }
+    deriving (Generic, Show, Eq, FromJSON)
+
+-- actions that can be received from Elm clients
+data WSCmd
+    = ReceiveMsg { message :: Text }
+    | ReceiveModel { model :: Text }
+    deriving (Generic, Show, FromJSON)
+
+data ReceiveConnected
+    = ReceiveClientConnected { v :: Text, serverUUID :: UUID }
+    | ReceiveHeadlessConnected { key :: Text, serverUUID :: UUID }
+    deriving (Generic, Show)
+
+instance FromJSON ReceiveConnected where
+  parseJSON = withObject "ReceiveConnected" $ \o -> do
+    v <- o .:? "v"
+    serverUUID <- o .: "serverUUID"
+    key <- o .:? "key"
+    case v of
+      Just v' -> return $ ReceiveClientConnected v' serverUUID
+      Nothing -> case key of
+        Just key' -> return $ ReceiveHeadlessConnected key' serverUUID
+        Nothing -> fail "Invalid JSON"
+
+-- create a JSON instance for WSClientCmd
+instance ToJSON WSClientCmd where
+    toJSON SendConnected = object [ "cmd" .= ("c" :: Text) ]
+    toJSON CloseWS = object [ "cmd" .= ("x" :: Text) ]
+    toJSON (SendModel model) = object [ "cmd" .= ("m" :: Text), "model" .= model ]
+    toJSON (SendMsg id message) = 
+        object 
+            [ "cmd" .= ("s" :: Text)
+            , "msg" .= message 
+            , "id"  .= id
+            ]
+    toJSON SendModelRequest = object [ "cmd" .= ("r" :: Text) ]
+
+
+-- state of a single WebSocket connection
+data TSWSServerController
+    = WaitingToConnect
+    | ClientConnected 
+        { 
+            serverId :: ServerID
+        ,   clientId :: ClientID
+        ,   isHeadless :: Bool
+        }
+    deriving (Eq, Show, Data)
+
+-- state of the entire WebSocket server
+data TSWSServerState
+    = WSServerState
+        {
+            nextId :: ClientID
+        ,   clientMap :: HashMap ServerID (HashSet ClientID)
+        ,   clientChannels :: HashMap ClientID WSClientQueue
+        ,   headlessClientIDs :: HashMap ServerID ClientID
+        ,   serverModels :: HashMap ServerID Data.Aeson.Value
+        ,   unstoredModels :: HashSet ServerID
+        ,   unstoredModelThreadStarted :: Bool
+        }
+
+data ModelStorerMsg = NewModelStored
+
+\end{lstlisting}

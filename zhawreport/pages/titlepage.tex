@@ -1,0 +1,55 @@
+%----------------------------------------
+%   TITLE PAGE
+%----------------------------------------
+% Define commands
+\newcommand{\supervisors}[1]{\gdef\@supervisors{#1}}
+\newcommand{\submittedon}[1]{\gdef\@submittedon{#1}}
+\newcommand{\studyprogram}[1]{\gdef\@studyprogram{#1}}
+\newcommand{\department}[1]{\gdef\@department{#1}}
+\newcommand{\course}[1]{\gdef\@course{#1}}
+
+% Initialize them to empty
+\supervisors{}
+\submittedon{}
+\studyprogram{}
+\department{}
+\course{}
+
+\renewcommand{\maketitle}{
+\begin{titlepage}
+
+    % logo
+    \begin{flushleft}
+        \includegraphics[width=30mm]{zhawreport/mcm-maroon_png.png} \\
+        \hfill
+    \end{flushleft}
+
+    \vskip 10em
+    
+    % title
+    \begin{flushleft}
+    	{\huge \textbf{\@title}}
+    	\rule{\textwidth}{0.5mm}
+    \end{flushleft}
+
+    \vskip 7em
+    % School and Institute
+    \begin{flushleft}
+    	\Large
+    	{\textsc{McMaster University}}\\
+        \Large
+        \textsc{\@department}
+    \end{flushleft}
+
+    \vfill
+    % table
+    \noindent
+    \begin{tabular}{@{} p{40mm} l}
+        \textbf{Authors} & \parbox[t]{50mm}{\@author} \vspace{3mm}\\
+        \textbf{Supervisors} & \parbox[t]{50mm}{\@supervisors} \vspace{3mm}\\
+        \textbf{Study Program} & \parbox[t]{50mm}{\@studyprogram} \vspace{3mm}\\
+        \textbf{Submitted on} & \parbox[t]{50mm}{\@submittedon}
+    \end{tabular}
+    
+\end{titlepage}
+}

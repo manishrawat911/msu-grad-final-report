@@ -1,0 +1,1130 @@
+\chapter{React Components, Redux State Management, Express Server}
+% {React Components, Redux State Management, Express Server}
+\label{appendix:B}
+
+\section{Chatroom}
+
+\begin{lstlisting}[language=Java, caption={Login Page}, label={lst:java}]
+'use client'
+
+import { useRouter } from "next/navigation";
+import { useAppDispatch } from "../hooks";
+import { setUserInfo } from "../global.state";
+
+export default function LoginPage() {
+    const router = useRouter();
+    const dispatch = useAppDispatch();
+
+    const handleSubmit = async (formData: any) => {
+        const username = formData.get("username");
+        const password = formData.get("password");
+        const ob_json = {
+            username: username,
+            password: password
+        }
+        try {
+            const response = await fetch('http://localhost:5050/login/admin', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(ob_json)
+            });
+
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+
+            dispatch(setUserInfo({username:  username, userType: "admin", isLoggedIn: true}));
+            const data = await response.json();
+            console.log(data); // Handle the response data
+            router.push('/session/new') 
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    }
+
+    return (
+        <div className="flex min-w-full h-[90%] bg-gray-100 justify-center items-center content-center">
+            <div className="container 
+                            flex 
+                            flex-col 
+                            rounded-lg
+                            p-5 
+                            w-fit h-fit 
+                            bg-slate-600
+                            justify-center 
+                            items-center">
+                <form className="flex flex-col space-y-0.5 content-center items-center" action={handleSubmit}>
+                    <h1 className="text-center text-slate-100 ">Login</h1>
+                    <input className="rounded p-2" type='text' id='username' placeholder="username" name='username' required/><br />
+                    <input className="rounded p-2" type='password' id='password' placeholder="password" name='password' required/><br />
+                    <button className="p-1 w-1/2 text-green-950 font-bold bg-green-400 rounded place-self-center" type="submit">Submit</button>
+                </form>
+            </div>
+            <p></p>
+        </div>
+    )
+}
+\end{lstlisting}
+\begin{lstlisting}[language=Java, caption={New Session Page}, label={lst:java}]
+'use client'
+
+import { selectIsLoggedIn, selectSessionID, selectUserType } from "/app/global.state";
+import { useAppDispatch, useAppSelector } from "/app/hooks";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { setSessionId } from "/app/global.state";
+
+let nextId = 1;
+
+export default function NewSession(){
+
+    const dispatch = useAppDispatch();
+    const loggedIn = useAppSelector(selectIsLoggedIn);
+    const userType = useAppSelector(selectUserType);
+    const sessionId = useAppSelector(selectSessionID);
+    
+    const router = useRouter();
+
+    const [participants, setParticipants] = useState([]);
+    const addParticipants = (formData: any) =>{
+        let username = formData.get('username');
+        let password = formData.get('password');
+        
+        for(let i=0;i<participants.length;i++){
+            console.log(participants[i].username);
+
+            if(participants[i].username === username){
+                alert(`User ${username} already exists!`);
+                return;
+            }
+        }
+        setParticipants([...participants, {username: username , password : password }]);
+    };
+
+    const startSession = async () =>{
+        console.log("trying to start session");
+        const ob_json = {
+            username: "admin",
+            participants: participants
+        }
+        console.log(`session data: ${JSON.stringify(ob_json)}`);
+        try {
+            const response = await fetch('http://localhost:5050/session', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(ob_json)
+            });
+
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+
+            const data = await response.json();
+            dispatch(setSessionId(data.sessionId));
+            console.log(data); // Handle the response data
+            router.push(`/chatroom/${data.sessionId}`) 
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    };
+    return (
+        <div className="container h-5/6 flex flex-col justify-center items-center bg-slate-300">
+            <h1>Add  Participants</h1>
+            <div className="flex space-x-1">
+                <form className="flex flex-col space-y-1" action={addParticipants}>
+                    <input required name="username" type="text" placeholder="username"></input>
+                    <input required name="password" type="password" placeholder="password"></input>
+                    <button className="bg-blue-500 text-white rounded" type="submit">Add</button>
+                </form>
+                <button className="bg-green-500 p-3 text-white rounded" onClick={startSession}>Go!</button>
+            </div>
+            <p>List of participants</p>
+            <ul>
+                {participants.map( participant =>
+            <li>username: {participant.username}, password: {participant.password}</li>
+            )}
+            </ul>
+        </div>
+    )
+}
+\end{lstlisting}
+\begin{lstlisting}[language=Java, caption={Message Input Component}, label={lst:java}]
+export default function MessageInput({send}) {
+    return (
+        <div className="h-1/6 bg-blue-400 flex p-2 space-x-1">
+            <form className="flex basis-full space-x-1" action={send}>
+                <input name="message" className="basis-5/6 placeholder:italic" placeholder="type..." type="text" />
+                <button type="submit" className="basis-1/6 bg-green-800 w-1/6 h-full rounded text-fuchsia-100">Send</button>
+            </form>
+        </div>
+    )
+}
+\end{lstlisting}
+\begin{lstlisting}[language=Java, caption={Message View Component}, label={lst:java}]
+'use client'
+export default function MessagesView({ messages }) {
+    return (
+        <>
+            <div className="flex flex-col h-4/6 bg-red-500">
+                {JSON.stringify(messages)}
+            </div>
+        </>
+    )
+}
+\end{lstlisting}
+\begin{lstlisting}[language=Java, caption={Chat Page Component}, label={lst:java}]
+'use client'
+import { SocketProvider, useSocket } from "/app/SocketProvider";
+import { selectIsLoggedIn, selectSessionID, selectUserType, selectUsername, setUserInfo } from "/app/global.state";
+import { useAppDispatch, useAppSelector } from "/app/hooks";
+import MessageInput from "/lib/components/chat/message_input";
+import MessagesView from "/lib/components/chat/messages_view";
+import { time } from "console";
+import { stringify } from "querystring";
+import { useEffect, useState } from "react";
+
+export default function ChatPage({ params }: { params: { id: string } }) {
+    const dispatch = useAppDispatch();
+    const loggedIn = useAppSelector(selectIsLoggedIn);
+    const userType = useAppSelector(selectUserType);
+    const sessionId = useAppSelector(selectSessionID);
+
+    if (!sessionId) {
+        dispatch(setUserInfo({ sessionId: params.id }));
+    }
+    if (!loggedIn && userType != "admin") return (
+        <ParticipantLogin />
+    )
+    return (
+        <>
+            <div className="container mx-auto 2xl:max-w-3xl justify-center items-center">
+                <h1>Chat room id:  {params.id}</h1>
+                <SocketProvider>
+                    <ChatView userType={userType} />
+                </SocketProvider>
+            </div>
+        </>
+    )
+}
+
+function ChatView({ userType }: { userType: string }) {
+    const [chatHistory, setChatHistory] = useState([]);
+    const username = useAppSelector(selectUsername)
+    const { socket, isConnected } = useSocket();
+    const sessionId = useAppSelector(selectSessionID)
+    const date = new Date();
+
+    function sendMessage(formData) {
+        const json_ob = {
+            sender: username,
+            roomId: sessionId,
+            message: formData.get("message")
+        }
+        if(socket)
+            socket.emit('sendMessage', json_ob);
+    }
+    useEffect(() => {
+        if (socket) {
+            if (userType == 'user') {
+                socket.emit('joinRoom', { sessionId, username });
+                console.log("joining session to chat");
+            }
+            else if (userType == 'admin') {
+                socket.emit('createRoom', { sessionId, username })
+                console.log(`session creation initiated by admin `)
+            }
+            socket.on('roomCreated', (data) => {
+                console.log(`Room created: ${JSON.stringify(data)}`);
+            });
+    
+            socket.on('joinedRoom', (data) => {
+                console.log('Joined room');
+                setChatHistory((previousState) => {
+                console.log(`previous messages: ${JSON.stringify(data)}`)
+                   return data.chatHistory
+                });
+            });
+            socket.on('newMessage', (data) => {
+                console.log(`New message : ${JSON.stringify(data)}`);
+                setChatHistory((previousChatHistory) => {
+                    console.log(`Previous messages so far: ${JSON.stringify(previousChatHistory)}`);
+                    return [...previousChatHistory, data];
+                })
+            });
+            socket.on('userJoined', (data) => {
+                console.log(`New user joined: ${JSON.stringify(data)}`)
+            });
+            socket.on('userLeft', (data) => {
+                console.log(`User left:, ${stringify(data)}`);
+            });
+        }
+        if (!isConnected) {
+            console.log('Unable to connect to the server')
+        }
+
+    }, [socket]);
+    const messageHolder = chatHistory.map(message => {
+        return (
+            <div className="flex flex-col-reverse bg-slate-100 rounded m-1 p-2">
+                <p className="text-blue-800 text-sm/[9px]">{message.username}</p>
+                <p className="font-bold">{message.message}</p>
+            </div>
+        )
+    });
+
+    return (
+        <>
+            <div className="container flex flex-col h-4/6 bg-stone-400 rounded p-2 justify-center">
+                {messageHolder}
+            </div>
+            <MessageInput send={sendMessage}/>
+        </>
+    )
+}
+
+function ParticipantLogin() {
+    const dispatch = useAppDispatch();
+    const sessionId = useAppSelector(selectSessionID);
+
+    const handleSubmit = async (formData: any) => {
+        const username = formData.get("username");
+        const password = formData.get("password");
+        const ob_json = {
+            username: username,
+            password: password,
+            sessionId: sessionId
+        }
+        try {
+            const response = await fetch('http://localhost:5050/login/participant', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(ob_json)
+            });
+            if (!response.ok) {
+                console.log(response.body)
+                throw new Error('Network response was not ok');
+            }
+            const data = await response.json();
+            dispatch(setUserInfo({ username: username, userType: "user", isLoggedIn: true, sessionId: sessionId }));
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    }
+    return (
+        <div className="flex min-w-full h-full bg-gray-100 justify-center items-center content-center">
+            <div className="container 
+                            flex 
+                            flex-col 
+                            rounded-lg
+                            p-5 
+                            w-fit h-fit 
+                            bg-slate-600
+                            justify-center 
+                            items-center">
+                <form className="flex flex-col space-y-0.5 content-center items-center" action={handleSubmit}>
+                    <h1 className="text-center text-slate-100 ">Participant Login</h1>
+                    <input className="rounded p-2" type='text' id='username' placeholder="username" name='username' required /><br />
+                    <input className="rounded p-2" type='password' id='password' placeholder="password" name='password' required /><br />
+                    <button className="p-1 w-1/2 text-green-950 font-bold bg-green-400 rounded place-self-center" type="submit">Submit</button>
+                </form>
+                <p className="text-sm text-gray-300">Enter password provided by instructor or TA</p>
+            </div>
+        </div>
+    )
+}
+\end{lstlisting}
+\begin{lstlisting}[language=Java, caption={Socket Provider Component}, label={lst:java}]
+'use client'
+import { createContext, useContext, useEffect, useState } from "react";
+import { io as ClientIO } from 'socket.io-client'
+import { useAppSelector } from "./hooks";
+import { selectSessionID } from "./global.state";
+
+export type SocketContextType = {
+    socket: any | null,
+    isConnected: boolean
+}
+
+const defaultSocket = {
+    socket: null,
+    isConnected: false
+};
+
+export const SocketContext = createContext<SocketContextType>(defaultSocket);
+
+export const useSocket = () => {
+    return useContext(SocketContext);
+}
+
+
+export const SocketProvider= ({ children }: { children: React.ReactNode }) => {
+
+    const [socket, setSocket] = useState<any | null>(null);
+    const [isConnected, setIsConnected] = useState(false);
+
+    useEffect(() => {
+
+        const socketInstance = new (ClientIO as any)(`http://localhost:5050`); // 
+        // Add an event listener to handle connections
+        socketInstance.on('connect', () => {  // explain what happening here
+            console.log("Websocket connected    !");
+            setIsConnected(true);
+            
+        });
+        socketInstance.on('disconnect', (reason: any) => {
+            console.warn(`Websocket disconnected because of ${reason}`);
+            setIsConnected(false);
+        });
+        setSocket(socketInstance);
+        //Clean up function that gets called whenever this component unmounts
+        return () => {
+            console.log("Disconnecting websocket...");
+            // Close the connection when this component unmounts
+            socketInstance.disconnect();
+        };
+     }, []);
+    return (
+        <SocketContext.Provider value={{socket: socket, isConnected: isConnected}}>
+            {children}
+        </SocketContext.Provider>
+    )
+}
+\end{lstlisting}
+\begin{lstlisting}[language=Java, caption={Application State}, label={lst:java}]
+import { createSlice } from "reduxjs/toolkit"
+
+export interface CustomizedAppConfig {
+    isLoggedIn: boolean,
+    username: string,
+    userType: "admin" | "user" | "unknown"
+    sessionId: string
+}
+
+const defaultConfig: CustomizedAppConfig = {
+    isLoggedIn: false,
+    username: "",
+    userType: "unknown",
+    sessionId: ""
+}
+
+export const globalSlice = createSlice(
+    {
+        name: "global",
+        initialState: defaultConfig,
+        reducers: {
+            setUserInfo: (state, action) => {
+                return { ...state, ...action.payload };
+            },
+            setSessionId: (state, action) => {
+                return { ...state, sessionId: action.payload}
+            },
+            logout: state => { 
+                return defaultConfig;    
+            }
+        }
+    })
+
+// Action creators are generated for each case reducer function
+export const { setUserInfo, setSessionId, logout } = globalSlice.actions
+
+export const selectIsLoggedIn = (state: any): boolean => state.global.isLoggedIn
+export const selectUsername = (state: any): string => state.global.username
+export const selectUserType = (state: any): "admin"|"user" => state.global.userType
+export const selectSessionID = (state:  any):string=> state.global.sessionId
+
+export default globalSlice.reducer      
+\end{lstlisting}
+\begin{lstlisting}[language=Java, caption={Express Backend Server}, label={lst:java}]
+import { Session } from "inspector";
+
+const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
+const cors = require('cors');
+const bodyParser = require('body-parser');
+
+
+const app = express();
+app.use(cors());
+const server = http.createServer(app);
+const port = 5050;
+const io = socketIo(server, {
+    cors: {
+        origin: "*", // Update this with your client's domain
+        methods: ["GET", "POST"]
+    }
+});
+
+app.use(bodyParser.json());
+
+const users: L_User[] = [
+    { username: "admin", password: "1234" }
+]
+
+const userSessions: Map<string, string> = new Map();
+const sessionParticipants: L_Session[] = [];
+const sessionMessages: Map<string, string[]> = new Map();
+const activeRooms = {};
+
+
+app.post("/login/admin", (request, response) => {
+    const { username, password } = request.body;
+    const user = users.find(user => user.username === username && user.password === password);
+
+    if (user) {
+        response.json({ message: 'Login successful' });
+    } else {
+        response.status(401).json({ error: 'Invalid username or password' });
+    }
+})
+
+app.post("/login/participant", (request, response) => {
+    const { username, password, sessionId } = request.body;
+    const r_session = sessionParticipants.find((session) => session.id == sessionId)
+
+    if(!r_session){
+        response.status(401).json({ error: 'Invalid session' });
+    }
+
+    const user = r_session?.participants.find(user => user.username === username && user.password === password);
+
+    if (user) {
+        response.json({ message: 'Login successful' });
+    } else {
+        response.status(401).json({ error: 'Invalid username or password' });
+    }
+})
+
+app.get("/session", (request, response) => {
+    const { username } = request.body;
+    const user = users.find(user => user.username === username);
+    
+    if (user) {
+        const session = userSessions.get(user.username);
+        if (session) {
+            response.json({ session });
+        } else {
+            response.status(404).json({ error: 'Session not found' });
+        }
+    }
+    else {
+        response.status(404).json({ error: 'User not found' });
+    }
+});
+
+app.post("/session", (request, response) => {
+    const data = request.body;
+    console.log(data);
+    const user = users.find(user => user.username === data.username);
+
+    if (user) {
+        const sessionId = Math.random().toString(36).substring(7);
+        const participants = data.participants;
+
+        if (participants) {
+            const temp_users: L_User[] = [];
+            for (const p of participants) {
+                temp_users.push({ username: p.username, password: p.password })
+            }
+            const session: L_Session = { id: sessionId, participants: temp_users };
+            console.log(`Session create: ${sessionId}, Users: ${temp_users.toString()}`)
+            sessionParticipants.push(session);
+            userSessions.set(user.username, sessionId);
+        }
+        response.json({ sessionId });
+    } else {
+        response.status(404).json({ error: 'User not found' });
+    }
+});
+
+app.get('/chatroom/:sessionId', (req, res) => {
+    const sessionId = req.params.sessionId;
+    if (!sessionId) {
+      return res.status(400).send('Missing sessionId parameter');
+    }
+  
+    // Create a new namespace for the chatroom with the sessionId
+    const chatroom = io.of(`/chatroom/${sessionId}`);
+  
+    chatroom.on('connection', (socket) => {
+      console.log(`Socket connected to chatroom: ${sessionId}`);
+  
+      // Handle socket events specific to this chatroom
+      socket.on('message', (data) => {
+        console.log(`Message received in ${sessionId}: ${data}`);
+        // Broadcast the message to all connected sockets in the chatroom
+        chatroom.emit('message', data);
+      });
+  
+      // Handle socket disconnection
+      socket.on('disconnect', () => {
+        console.log(`Socket disconnected from chatroom: ${sessionId}`);
+      });
+    });
+  
+    // Send a success response to the UI
+    res.send('Chatroom created');
+  });
+
+io.on('connection', (socket) => {
+    let roomId;
+
+    socket.on('createRoom', (payload) => {
+
+        activeRooms[payload.sessionId] = { users: [payload.username], messages: [] };
+        socket.join(payload.sessionId);
+        socket.emit('roomCreated', payload);
+        console.log(`Payload recieved:: ${JSON.stringify(payload)}`);
+    });
+
+    socket.on('joinRoom', (data) => {
+
+        const room = activeRooms[data.sessionId];
+        if (room) {
+            roomId = data.sessionId;
+            socket.join(roomId);
+            room.users.push(data.username);
+            
+            // Send chat history to the new user
+            const chatHistory = room.messages.map(({ username, message }) => ({ username: username, message }));
+            socket.emit('joinedRoom', { chatHistory });
+            
+            io.to(roomId).emit('userJoined', { userId: socket.id });
+        }
+    });
+
+    // Handler for sending a message
+    socket.on('sendMessage', (data) => {
+        const { sender, roomId, message } = data;
+        const room = activeRooms[roomId];
+        if (room) {
+            room.messages.push({ username: sender, message });
+            io.to(roomId).emit('newMessage', { username: sender, message });
+        }
+    });
+
+    // Handler for disconnecting
+    socket.on('disconnect', () => {
+        if (roomId) {
+            const room = activeRooms[roomId];
+            if (room) {
+                room.users = room.users.filter(userId => userId !== socket.id);
+                io.to(roomId).emit('userLeft', { userId: socket.id });
+                if (room.users.length === 0) {
+                    console.log(`deleting room: ${roomId} since total  users are: ${room.users.length}`)
+                    delete activeRooms[roomId];
+                }
+            }
+        }
+    });
+});
+
+server.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+});
+
+type L_User = {
+    username: string,
+    password: string,
+}
+
+type L_Session = {
+    id: string
+    participants: L_User[]
+}
+
+\end{lstlisting}
+
+
+\section{Calendar-Sync}
+\vspace{6pt}
+\begin{lstlisting}[language=Java, caption={Calendar Page}, label={lst:java}]
+'use client'
+import { Calendar, momentLocalizer, Event, Views } from 'react-big-calendar';
+import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop';
+import moment from 'moment';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { v4 as uuidv4 } from 'uuid';
+
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "/components/ui/dialog"
+import { Button } from '/components/ui/button';
+import { Label } from '/components/ui/label';
+import { Input } from '/components/ui/input';
+import { useSocket } from '/app/SocketProvider';
+
+const localizer = momentLocalizer(moment)
+const DnDCalendar = withDragAndDrop(Calendar);
+
+interface MyEvent extends Event {
+    title: string;
+    resourceId: string;
+}
+
+
+export default function Page({ params }: { params: { id: string } }) {
+    const [events, setEvents] = useState<MyEvent[]>();
+    const [newEvent, setNewEvent] = useState<MyEvent | null>(null);
+    const [open, setOpen] = useState(false);
+    const [date, setDate] = useState(new Date(2015, 3, 1));
+    const [view, setView] = useState(Views.WEEK);
+
+    const { socket, isConnected } = useSocket();
+    const socketRef = useRef(socket);
+
+    const onNavigate = useCallback((newDate) => setDate(newDate), [setDate])
+    const onView = useCallback((newView) => setView(newView), [setView])
+
+    useEffect(() => {
+        if (socket) {
+            socket.emit('joinRoom', params.id);
+            socket.on('updateEvents', (newEvents) => {
+                console.log(`New update received: ${JSON.stringify(newEvents)}`);
+                setEvents(newEvents.map((event) => ({
+                    ...event,
+                    start: new Date(event.start),
+                    end: new Date(event.end)
+                })));
+            });
+            socket.on('allEvents', (allEvents: MyEvent[]) => {
+                console.log(`All events received: ${JSON.stringify(allEvents)}`);
+                setEvents(allEvents.map((event) => ({
+                    ...event,
+                    start: new Date(event.start),
+                    end: new Date(event.end)
+                })));
+                setEvents([...allEvents]);
+            })
+        }
+        socketRef.current = socket;
+    }, [socket])
+
+    function saveEvent() {
+        console.log(`Saving new event: ${newEvent.title}, ${newEvent.start}, ${newEvent.end} `);
+        setEvents((oldEvents) => {
+            if (socketRef.current) {
+                socket.emit('updateEvents', {
+                    sessionId: params.id,
+                    newEvents: [...oldEvents, newEvent]
+                });
+                console.log(`Socket available!`)
+            }
+            return [...oldEvents, newEvent];
+        });
+        setOpen(false);
+    }
+
+
+    function onSelectSlot(event) {
+        if (event.action === 'doubleClick') {
+            console.log(`Slot selected ${{ ...event }}`);
+            setNewEvent({
+                //generate random id for the event
+                resourceId: uuidv4(),
+                title: 'New Event',
+                start: event.start,
+                end: event.end,
+            });
+            if (socketRef.current) {
+                console.log(`Socket available!`)
+
+            }
+            setOpen(true);
+        }
+    }
+
+    function resizeEvent(event) {
+        let updatedEvent = events.find((e) => e.resourceId === event.event.resourceId);
+        if (updatedEvent) {
+            updatedEvent!.start = event.start;
+            updatedEvent!.end = event.end;
+            setEvents((oldEvents) => {
+                return oldEvents.map((e) => {
+                    if (e.resourceId === event.event.resourceId) {
+                        return updatedEvent;
+                    }
+                    return e;
+                });
+            }); params
+        }
+        if (socketRef.current) {
+            socket.emit('updateEvents', {
+                sessionId: params.id,
+                newEvents: events
+            });
+            console.log(`Socket available!`)
+        }
+        console.log(`Resized event title: ${event.event.title}`);
+        console.log(`Resized event resourceId: ${event.event.resourceId}`);
+        console.log(`Resized event start: ${event.start}`);
+        console.log(`Resized event end: ${event.end}`);
+    }
+    return (
+        <>
+            <h1>{params.id}</h1>
+            <Dialog open={open} onOpenChange={setOpen}>
+                <Button variant="outline">Edit Profile</Button>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>Add Event</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="name" className="text-right">
+                                Title
+                            </Label>
+                            <Input
+                                value={newEvent?.title}
+                                onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+                                className="col-span-3"
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="start" className="text-right">
+                                Starts at
+                            </Label>
+                            <Input value={newEvent?.start} readOnly
+                                id="start"
+                                defaultValue="peduarte"
+                                className="col-span-3"
+                            />
+                            <Label htmlFor="end" className="text-right">
+                                Ends at
+                            </Label>
+                            <Input value={newEvent?.end} readOnly
+                                id="end"
+                                defaultValue="peduarte"
+                                className="col-span-3"
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button type="submit" onClick={saveEvent}>Save changes</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            <DnDCalendar
+                localizer={localizer}
+                events={events}
+                selectable='true'
+                onSelectSlot={onSelectSlot}
+                defaultView='week'
+                views={['week']}
+                draggableAccessor={(event) => true}
+                startAccessor="start"
+                endAccessor="end"
+                onView={onView}
+                onNavigate={onNavigate}
+                resizable={true}
+                onEventResize={resizeEvent}
+                onEventDrop={resizeEvent}
+            />
+        </>
+    )
+}
+\end{lstlisting}
+\begin{lstlisting}[language=Java, caption={Welcome Page}, label={lst:java}]
+'use client'
+
+import { Button } from '/components/ui/button';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardFooter,
+    CardHeader,
+    CardTitle
+} from '/components/ui/card';
+import { Input } from '/components/ui/input';
+import { Label } from '/components/ui/label';
+import { Merge, SquarePlus } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import React from 'react';
+
+export default function WelcomePage() {
+    const router = useRouter();
+    const handleCreateSession = async () => {
+
+        try{
+            const response = await fetch('http://localhost:5050/session', {method:'POST'});
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            const data = await response.json();
+            router.push(`/session/${data.sessionId}`);
+        }
+        catch (error) {
+            console.error('Error:', error);
+        }
+    };
+
+    const handleJoinSession = async () => {
+        try {
+            const response = await fetch('http://localhost:3002/login/participant', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(ob_json)
+            });
+
+            if (!response.ok) {
+                console.log(response.body)
+                throw new Error('Network response was not ok');
+            }
+            const data = await response.json();
+            dispatch(setUserInfo({ username: username, userType: "user", isLoggedIn: true, sessionId: sessionId }));
+            console.log(data); // Handle the response data
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    };
+
+    return (
+        <div className='container min-h-screen min-w-full justify-center content-center flex'>
+            <Card className="w-[350px] h-fit self-center">
+                <CardHeader>
+                    <CardTitle>Calendar Sync</CardTitle>
+                    <CardDescription>Multi-client real-time calendar application. Create a new calendar or join exisiting one</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <form>
+                        <div className="grid w-full items-center gap-4">
+                            <div className="flex flex-col space-y-1.5">
+                                <Label htmlFor="uuid">UUID for existing session</Label>
+                                <Input id="uuid" placeholder="XXXX-XXXX-XXXX" />
+                            </div>
+                        </div>
+                    </form>
+                </CardContent>
+                <CardFooter className="
+                                    flex 
+                                    justify-between
+                                    ">
+                    <Button className='hover:bg-green-700' onClick={handleCreateSession}>
+                        <SquarePlus className='mr-2 ' />Create
+                    </Button>
+                    <Button className='hover:bg-teal-300' variant="outline">
+                        <Merge className='mr-2' />
+                        Join
+                    </Button>
+                </CardFooter>
+            </Card>
+        </div>
+    );
+};
+\end{lstlisting}
+\begin{lstlisting}[language=Java, caption={Socket Provider Component}, label={lst:java}]
+'use client'
+import { createContext, useContext, useEffect, useState } from "react";
+import { io as ClientIO } from 'socket.io-client'
+
+export type SocketContextType = {
+    socket: any | null,
+    isConnected: boolean
+}
+
+const defaultSocket = {
+    socket: null,
+    isConnected: false
+};
+
+export const SocketContext = createContext<SocketContextType>(defaultSocket);
+
+export const useSocket = () => {
+    return useContext(SocketContext);
+}
+
+export const SocketProvider= ({ children }: { children: React.ReactNode }) => {
+    const [socket, setSocket] = useState<any | null>(null);
+    const [isConnected, setIsConnected] = useState(false);
+
+    useEffect(() => {
+        const socketInstance = new (ClientIO as any)(`http://localhost:5050`);
+        console.log("Creating websocket...")
+        
+        // Add an event listener to handle connections
+        socketInstance.on('connect', () => {
+            console.log("Websocket connected    !");
+            setIsConnected(true);
+        });
+        
+        socketInstance.on('disconnect', (reason: any) => {
+            console.warn(`Websocket disconnected because of ${reason}`);
+            setIsConnected(false);
+        });
+
+        setSocket(socketInstance);
+        
+        //Clean up function that gets called whenever this component unmounts
+        return () => {
+            console.log("Disconnecting websocket...");
+            // Close the connection when this component unmounts
+            socketInstance.disconnect();
+        };
+
+     }, []);
+     
+    return (
+        <SocketContext.Provider value={{socket: socket, isConnected: isConnected}}>
+            {children}
+        </SocketContext.Provider>
+    )
+}
+\end{lstlisting}
+\begin{lstlisting}[language=Java, caption={Express Backend server}, label={lst:java}]
+const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
+const cors = require('cors');
+const bodyParser = require('body-parser');
+
+const app = express();
+app.use(cors());
+const server = http.createServer(app);
+const port = 5050
+const io = socketIo(server, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    }
+});
+app.use(bodyParser.json());
+
+const activeRooms = {};
+
+app.get("/session", (request, response) => {
+    const { username } = request.body;
+
+    const user = users.find(user => user.username === username);
+    if (user) {
+        const session = userSessions.get(user.username);
+        if (session) {
+            response.json({ session });
+        } else {
+            response.status(404).json({ error: 'Session not found' });
+        }
+    }
+    else {
+        response.status(404).json({ error: 'User not found' });
+    }
+});
+
+app.post("/session", (request, response) => {
+    const data = request.body;
+    console.log(data);
+    const user = users.find(user => user.username === data.username);
+
+    if (user) {
+        const sessionId = Math.random().toString(36).substring(7);
+        const participants = data.participants;
+
+        if (participants) {
+            const temp_users: L_User[] = [];
+            for (const p of participants) {
+                temp_users.push({ username: p.username, password: p.password })
+            }
+            const session: L_Session = { id: sessionId, participants: temp_users };
+            console.log(`Session create: ${sessionId}, Users: ${temp_users.toString()}`)
+            sessionParticipants.push(session);
+            userSessions.set(user.username, sessionId);
+        }
+        response.json({ sessionId });
+    } else {
+        response.status(404).json({ error: 'User not found' });
+    }
+});
+
+app.get('/chatroom/:sessionId', (req, res) => {
+    const sessionId = req.params.sessionId;
+    if (!sessionId) {
+       return res.status(400).send('Missing sessionId parameter');
+    }
+  
+    // Create a new namespace for the chatroom with the sessionId
+    const chatroom = io.of(`/chatroom/${sessionId}`);
+  
+    chatroom.on('connection', (socket) => {
+      console.log(`Socket connected to chatroom: ${sessionId}`);
+  
+      // Handle socket events specific to this chatroom
+      socket.on('message', (data) => {
+        console.log(`Message received in ${sessionId}: ${data}`);
+        // Broadcast the message to all connected sockets in the chatroom
+        chatroom.emit('message', data);
+      });
+  
+      // Handle socket disconnection
+      socket.on('disconnect', () => {
+        console.log(`Socket disconnected from chatroom: ${sessionId}`);
+      });
+    });
+  
+    // Send a success response to the UI
+    res.send('Chatroom created');
+  });
+
+
+io.on('connection', (socket) => {
+    let roomId;
+
+    socket.on('createRoom', (payload) => {
+        console.log(`MSG createRoom => Payload recieved: ${JSON.stringify(payload)}`);
+    });
+
+    socket.on('joinRoom', (payload) => {
+
+        const room = activeRooms[payload];
+        if(!room){
+            activeRooms[payload] = {events:[]};
+            console.log(`New room created: ${payload}`);
+            activeRooms[payload].userCount = 1;
+        }
+        console.log(`All rooms: ${JSON.stringify(activeRooms)}`);
+        if (room) {
+            socket.join(payload);
+            // Send chat history to the new user
+            const events = activeRooms[payload].events;
+            socket.emit('allEvents', events);
+            activeRooms[payload].userCount++;
+        }
+        console.log(`MSG joinRoom => Payload recieved: ${JSON.stringify(payload)}`);
+    });
+
+    // Handler for sending a message
+    socket.on('updateEvents', (payload) => {
+        const { sessionId, newEvents} = payload;
+        const room = activeRooms[sessionId];
+        if (room) {
+            console.log(`Updating events for room: ${sessionId}`);
+            room.events= newEvents;
+            io.to(sessionId).emit('updateEvents', newEvents);
+        }
+        console.log(`All rooms: ${JSON.stringify(activeRooms)}`);
+        console.log(`MSG updateEvents => Payload received: ${JSON.stringify(payload)}`);
+    });
+
+    // Handler for disconnecting
+    socket.on('disconnect', () => {
+        console.log(`Disconnecting...`);
+    });
+});
+
+server.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+});
+
+% \end{lstlisting}
+% \begin{lstlisting}[language=Java, caption={Login Page}, label={lst:java}]
+\end{lstlisting}
